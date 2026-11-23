@@ -1,0 +1,15 @@
+#!/bin/bash
+#BSUB -J retrieval-sparse
+#BSUB -q hpc
+#BSUB -n 2
+#BSUB -R "span[hosts=1]"
+#BSUB -R "rusage[mem=3GB]"
+#BSUB -W 00:20
+#BSUB -o outputs/retrieval/jobs/sparse-%J.out
+#BSUB -e outputs/retrieval/jobs/sparse-%J.err
+
+set -e
+
+for split in dev test; do
+    .venv/bin/python -u main.py -m dataset=fiqa,squad retriever=tf_idf,bm25 split="$split"
+done

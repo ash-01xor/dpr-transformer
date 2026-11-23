@@ -1,0 +1,9 @@
+pooling_type: cls
+d_model: 128
+n_heads: 4
+n_layers: 4
+feed_forward_dim: 512
+dropout: 0.1
+vocab_size: 16000
+query_length: 32
+passage_length: 128

@@ -1,0 +1,11 @@
+#!/bin/bash
+#BSUB -J retrieval-results
+#BSUB -q hpc
+#BSUB -n 1
+#BSUB -R "rusage[mem=1GB]"
+#BSUB -W 00:05
+#BSUB -o outputs/retrieval/jobs/results-%J.out
+#BSUB -e outputs/retrieval/jobs/results-%J.err
+
+
+.venv/bin/python -m src.evaluation.results
