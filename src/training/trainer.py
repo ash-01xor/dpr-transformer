@@ -49,8 +49,10 @@ def train(cfg, corpus):
     loss_function = DPRLoss()
     best = float("-inf")
     checkpoint = checkpoint_path(cfg)
+    latest_checkpoint = checkpoint.with_name("checkpoint_latest.pt")
     checkpoint.parent.mkdir(parents=True, exist_ok=True)
     history = []
+    cutoffs = sorted({*cfg.cutoffs, 10})
     progress = list(range(len(train_queries)))
     for epoch in range(1, cfg.training.epochs + 1):
         model.train()
@@ -74,38 +76,49 @@ def train(cfg, corpus):
             optimizer.step()
             total_loss += loss.detach().item() * len(batch)
         model.eval()
-        mrr = development_mrr(model, dev_queries, dev_tokens, passage_tokens, document_ids, cfg.batch_size)
-        entry = {"epoch": epoch, "train_loss": total_loss / len(train_queries), "dev_mrr_at_10": mrr}
+        scores = development_metrics(
+            model, dev_queries, dev_tokens, passage_tokens, document_ids, cfg.batch_size, cutoffs,
+        )
+        mrr = scores[10]["mrr"]
+        entry = {"epoch": epoch, "train_loss": total_loss / len(train_queries)}
+        for k, metrics in scores.items():
+            entry.update({f"dev_{metric}_at_{k}": value for metric, value in metrics.items()})
         history.append(entry)
         print(json.dumps(entry), flush=True)
-        if mrr > best:
-            best = mrr
+        is_best = mrr > best
+        is_milestone = cfg.training.epochs > 20 and epoch % 20 == 0
+        if is_best or is_milestone:
             experiment = OmegaConf.to_container(cfg, resolve=True)
             experiment["selection"] = entry
             experiment["dataset"] = cfg.dataset.name
             experiment["training_dtype"] = "bfloat16" if use_bfloat16 else "float32"
             experiment["torch_version"] = str(torch.__version__)
             experiment["checkpoint_id"] = uuid4().hex
-            save_checkpoint(model, checkpoint, experiment)
+            if is_best:
+                best = mrr
+                save_checkpoint(model, checkpoint, experiment)
+            if is_milestone:
+                save_checkpoint(model, latest_checkpoint, experiment, write_sidecars=False)
     (checkpoint.parent / "training.json").write_text(json.dumps(history, indent=2) + "\n", encoding="utf-8")
 
 
 @torch.inference_mode()
-def development_mrr(model, queries, query_tokens, passage_tokens, document_ids, batch_size):
+def development_metrics(model, queries, query_tokens, passage_tokens, document_ids, batch_size, cutoffs):
     corpus_vectors = model.encode_batches(passage_tokens, batch_size, passage=True)
+    top_k = min(max(cutoffs), len(document_ids))
     relevancies = []
     start = 0
     for token_batch in query_tokens.split(batch_size):
         scores = model.encode(token_batch) @ corpus_vectors.T
-        indices = scores.topk(min(10, len(document_ids)), dim=1).indices.cpu().tolist()
+        indices = scores.topk(top_k, dim=1).indices.cpu().tolist()
         for query, ranking in zip(queries[start:start + len(indices)], indices, strict=True):
             relevant = set(query.relevant_document_ids)
             relevancies.append([document_ids[i] in relevant for i in ranking])
         start += len(indices)
-    return Evaluate(relevancies, queries, (10,))[10]["mrr"]
+    return Evaluate(relevancies, queries, cutoffs)
 
 
-def save_checkpoint(model, path, experiment):
+def save_checkpoint(model, path, experiment, *, write_sidecars=True):
     with NamedTemporaryFile(dir=path.parent, delete=False) as temporary:
         temporary_path = Path(temporary.name)
     try:
@@ -118,7 +131,8 @@ def save_checkpoint(model, path, experiment):
         os.replace(temporary_path, path)
     finally:
         temporary_path.unlink(missing_ok=True)
-    model.tokenizer.no_padding()
-    model.tokenizer.no_truncation()
-    model.tokenizer.save(str(path.parent / "tokenizer.json"))
-    (path.parent / "configuration.json").write_text(json.dumps(experiment, indent=2) + "\n", encoding="utf-8")
+    if write_sidecars:
+        model.tokenizer.no_padding()
+        model.tokenizer.no_truncation()
+        model.tokenizer.save(str(path.parent / "tokenizer.json"))
+        (path.parent / "configuration.json").write_text(json.dumps(experiment, indent=2) + "\n", encoding="utf-8")
