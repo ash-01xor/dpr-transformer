@@ -43,7 +43,19 @@ done
 python -m src.evaluation.results
 ```
 
-The first DPR evaluation builds the FAISS inner-product index and reloads it for search. Subsequent runs reuse the saved index for that checkpoint. The results command writes `outputs/retrieval/test_results.csv` with Precision@k, Recall@k, and MRR@k for all six comparisons at cutoffs 1, 5, 10, and 20. Each dataset's DPR `attention/` directory contains token-labeled PDFs for a hit and a miss at rank 10. The report labels development examples when the test split lacks either outcome.
+The first DPR evaluation builds the FAISS inner-product index and reloads it for search. Subsequent runs reuse the saved index for that checkpoint. The results command writes `outputs/retrieval/test_results.csv` with Precision@k, Recall@k, and MRR@k for all six comparisons at cutoffs 1, 5, 10, and 20.
+
+Attention analysis saves examples, attention weights, and heatmaps from the requested split. By default it selects two queries with a judged relevant passage in the top ten and two without one. Use `attention.k` and `attention.examples_per_outcome` to change the selection.
+
+The saved arrays retain every layer and head. To plot individual heads, pass the array file and one-based layer/head numbers. Repeat the panel option to compare heads in one figure.
+
+```bash
+python -m src.evaluation.plot_attention \
+  --panel ARRAY_FILE 4 2 --panel ARRAY_FILE 4 4 \
+  --output FIGURE_PREFIX
+```
+
+This writes a PDF and PNG using the same colour scale for each panel.
 
 Run the encoder, training, and persistence checks with `python -m pytest -q` after installing pytest.
 

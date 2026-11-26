@@ -12,6 +12,10 @@ seed: 42
 split: dev
 batch_size: 128
 cutoffs: [1, 5, 10, 20]
+attention:
+  output_root: outputs/attention
+  k: 10
+  examples_per_outcome: 2
 training:
   seed: null
   epochs: 4
