@@ -58,8 +58,8 @@ def main(cfg):
         from src.evaluation.attention import attention_report
         from src.retrievers.dense_index import load_dense_retriever
 
-        retriever, _ = load_dense_retriever(cfg, corpus)
-        attention_report(cfg, corpus, retriever)
+        retriever, experiment = load_dense_retriever(cfg, corpus)
+        attention_report(cfg, corpus, retriever, experiment)
         return
     if cfg.action != "evaluate":
         raise ValueError(f"Unsupported action for {cfg.retriever.method}: {cfg.action}")
