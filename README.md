@@ -26,6 +26,8 @@ done
 
 DPR learns a WordPiece vocabulary from training questions and their relevant passages. The trainer saves the epoch with the highest development MRR@10, both encoders, the tokenizer, and the settings under `outputs/retrieval/<dataset>/dpr/`.
 
+The top-level `seed` controls data splitting. `training.seed` controls PyTorch initialization, dropout, batch shuffling, and positive-passage sampling. It defaults to the top-level seed when omitted or set to `null`. Checkpoint metadata records the effective training seed. To vary training randomness on a fixed split, use `seed=42 training.seed=43` and a separate `output_dir` for each run. Evaluation uses the original split seed, for example `seed=42`, when loading that run.
+
 Runs configured for more than 20 epochs also save `checkpoint_latest.pt` at epoch 20 and replace it every 20 epochs. Evaluation loads the best checkpoint, `checkpoint.pt`, by default. Use a distinct `output_dir` for each experiment to keep its checkpoints and metrics together.
 
 ## Held-out evaluation and attention

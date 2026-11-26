@@ -25,8 +25,11 @@ def checkpoint_path(cfg):
 
 
 def train(cfg, corpus):
-    torch.manual_seed(cfg.seed)
-    rng = random.Random(cfg.seed)
+    training_seed = cfg.training.get("seed")
+    if training_seed is None:
+        training_seed = cfg.seed
+    torch.manual_seed(training_seed)
+    rng = random.Random(training_seed)
     model_config = OmegaConf.to_container(cfg.model, resolve=True)
     train_queries = corpus.queries("train")
     dev_queries = corpus.queries("dev")
@@ -89,6 +92,7 @@ def train(cfg, corpus):
         is_milestone = cfg.training.epochs > 20 and epoch % 20 == 0
         if is_best or is_milestone:
             experiment = OmegaConf.to_container(cfg, resolve=True)
+            experiment["training"]["seed"] = training_seed
             experiment["selection"] = entry
             experiment["dataset"] = cfg.dataset.name
             experiment["training_dtype"] = "bfloat16" if use_bfloat16 else "float32"
